@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validar Factura | Dakata</title>
+  <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container mt-5">
+    <h2 class="text-center mb-4">Validar Factura</h2>
+    <form id="uploadForm">
+      <div class="mb-3">
+        <label for="fileInput" class="form-label">Selecciona tu factura (PDF o imagen):</label>
+        <input class="form-control" type="file" id="fileInput" accept=".pdf,.jpg,.png">
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Validar</button>
+    </form>
+
+    <div id="result" class="mt-4"></div>
+  </div>
+
+  <script src="assets/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
