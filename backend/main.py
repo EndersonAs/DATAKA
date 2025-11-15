@@ -52,28 +52,22 @@ def validate(payload: InvoicePayload):
 @app.post("/agent_explain")
 def agent_explain(payload: InvoicePayload):
     """
-    Recibe el mismo cuerpo que /validate, pero además
-    devuelve una explicación generada por el agente.
+    Igual que /validate, pero además llama al agente para generar una explicación.
+    NUNCA lanza 500: si algo sale mal con Gemini, devuelve un mensaje de error en agentAnswer.
     """
-    try:
-        validation_result = validate_invoice(payload.invoice)
-        explanation = ask_agent(payload.file_name, validation_result)
+    validation_result = validate_invoice(payload.invoice)
+    explanation = ask_agent(payload.file_name, validation_result)
 
-        # Opcional: aquí podrías guardar también la explicación en BD si quieres
-
-        return {
-            "fileName": payload.file_name,
-            "overallStatus": validation_result["overallStatus"],
-            "total": validation_result["total"],
-            "ok": validation_result["ok"],
-            "partial": validation_result["partial"],
-            "error": validation_result["error"],
-            "rules": validation_result["rules"],
-            "agentAnswer": explanation,
-        }
-    except Exception as e:
-        print("Error en agent_explain:", e)
-        raise HTTPException(status_code=500, detail="Error al generar explicación del agente")
+    return {
+        "fileName": payload.file_name,
+        "overallStatus": validation_result["overallStatus"],
+        "total": validation_result["total"],
+        "ok": validation_result["ok"],
+        "partial": validation_result["partial"],
+        "error": validation_result["error"],
+        "rules": validation_result["rules"],
+        "agentAnswer": explanation,
+    }
     
 @app.get("/history")
 def history():
