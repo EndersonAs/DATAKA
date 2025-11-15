@@ -9,16 +9,6 @@ Agente IA (Gemini) para explicar los resultados
 
 Permite cargar un archivo de factura y obtener su validación estructural, reglas cumplidas o fallidas, e interpretación generada por IA.
 
-# **🧩 Requisitos mínimos**
-
-**✔ Para el backend (Python)**
-  * Python 3.10+
-  * pip
-  * Una API Key de Google AI (GOOGLE_API_KEY)
-
-**✔ Para el frontend (React)**
-  * Node.js 18+
-  * npm
 
 # **📦 Instalación y ejecución**
 **1️⃣ Clonar el repositorio**
