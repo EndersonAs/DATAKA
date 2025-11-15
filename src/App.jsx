@@ -1,7 +1,154 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 const API_BASE = "http://127.0.0.1:8000"; // FastAPI
+
+// Diccionario de textos ES / EN
+const LABELS = {
+  es: {
+    appName: "Kila Validator",
+    operations: "Operaciones",
+    system: "Sistema",
+    validateMenu: "Validación de facturas",
+    historyMenu: "Historial",
+    settingsMenu: "Configuración (futuro)",
+
+    companyPill: "Demo Corporation ▾",
+    pageTitle: "Validación de Facturas",
+    pageSubtitle:
+      "Sube una factura en JSON y valida si cumple con los requisitos mínimos exigidos por la DIAN para importación.",
+
+    uploadProcessing: "Procesando...",
+    uploadLabel: "📂 Importar factura",
+
+    loadedFilePrefix: "Archivo cargado:",
+    errorLoadingHistory: "No se pudo cargar el historial desde el servidor.",
+    errorProcessingInvoice:
+      "No se pudo procesar la factura. Verifica que el JSON sea válido y que el backend esté corriendo.",
+    errorAgent: "No se pudo obtener la explicación del agente.",
+    errorAgentNoInvoice:
+      "Primero sube una factura para que el agente pueda analizarla.",
+
+    globalStatus: "Estado global",
+    totalRules: "Total requisitos",
+    okRules: "Cumplen",
+    partialRules: "Con observaciones",
+    errorRules: "Críticos",
+
+    globalHint: "Basado en los requisitos mínimos de la DIAN.",
+    totalHint: "Requisitos evaluados en la factura.",
+    okHint: "Requisitos completos.",
+    partialHint: "Datos parciales o dudosos.",
+    errorHint: "Campos que impedirían la nacionalización.",
+
+    tableTitle: "Resultado por requisito",
+    tableHint: "Sube una factura JSON para ver los resultados.",
+    tableColId: "#",
+    tableColReq: "Requisito",
+    tableColStatus: "Estado",
+    tableColDetail: "Detalle",
+
+    historyTitle: "Historial de Validaciones",
+    historySubtitle:
+      "Registros de las facturas analizadas (guardadas en SQLite).",
+    historyEmpty: "Todavía no has validado ninguna factura.",
+    historyColId: "ID",
+    historyColFile: "Archivo",
+    historyColDate: "Fecha",
+    historyColStatus: "Estado global",
+    historyColSummary: "Resumen",
+
+    agentButton: "🤖 Preguntar al agente",
+    agentButtonLoading: "Llamando al agente...",
+    agentTitle: "Explicación del agente",
+    agentSubtitle:
+      "Interpretación en lenguaje natural de los hallazgos de la validación.",
+
+    historySummary: (ok, partial, error) =>
+      `${ok} OK · ${partial} PARCIAL · ${error} ERROR`,
+  },
+
+  en: {
+    appName: "Kila Validator",
+    operations: "Operations",
+    system: "System",
+    validateMenu: "Invoice validation",
+    historyMenu: "History",
+    settingsMenu: "Settings (coming soon)",
+
+    companyPill: "Demo Corporation ▾",
+    pageTitle: "Invoice Validation",
+    pageSubtitle:
+      "Upload an invoice in JSON format and check if it meets the minimum requirements for import procedures.",
+
+    uploadProcessing: "Processing...",
+    uploadLabel: "📂 Upload invoice",
+
+    loadedFilePrefix: "Loaded file:",
+    errorLoadingHistory: "Could not load history from the server.",
+    errorProcessingInvoice:
+      "Could not process the invoice. Check that the JSON is valid and the backend is available.",
+    errorAgent: "Could not get the agent explanation.",
+    errorAgentNoInvoice: "Upload an invoice first so the agent can analyze it.",
+
+    globalStatus: "Overall status",
+    totalRules: "Total requirements",
+    okRules: "Pass",
+    partialRules: "With observations",
+    errorRules: "Critical",
+
+    globalHint: "Based on the minimum requirements.",
+    totalHint: "Requirements evaluated in this invoice.",
+    okHint: "Requirements that fully pass.",
+    partialHint: "Partial / unclear data.",
+    errorHint: "Fields that block import clearance.",
+
+    tableTitle: "Result per requirement",
+    tableHint: "Upload a JSON invoice to see the results.",
+    tableColId: "#",
+    tableColReq: "Requirement",
+    tableColStatus: "Status",
+    tableColDetail: "Details",
+
+    historyTitle: "Validation history",
+    historySubtitle:
+      "Records of all invoices that have been analyzed (stored in SQLite).",
+    historyEmpty: "You haven't validated any invoices yet.",
+    historyColId: "ID",
+    historyColFile: "File",
+    historyColDate: "Date",
+    historyColStatus: "Overall status",
+    historyColSummary: "Summary",
+
+    agentButton: "🤖 Ask the agent",
+    agentButtonLoading: "Asking the agent...",
+    agentTitle: "Agent explanation",
+    agentSubtitle: "Natural language interpretation of the validation results.",
+
+    historySummary: (ok, partial, error) =>
+      `${ok} OK · ${partial} PARTIAL · ${error} ERROR`,
+  },
+};
+const STATUS_TRANSLATIONS = {
+  es: {
+    Cumple: "Cumple",
+    "No cumple": "No cumple",
+    "Cumple parcialmente": "Cumple parcialmente",
+  },
+  en: {
+    Cumple: "Pass",
+    "No cumple": "Fail",
+    "Cumple parcialmente": "Partially compliant",
+  },
+};
 
 function App() {
   const [validation, setValidation] = useState(null); // reglas por requisito
@@ -25,6 +172,12 @@ function App() {
   const [agentAnswer, setAgentAnswer] = useState("");
   const [agentLoading, setAgentLoading] = useState(false);
 
+  // idioma
+  const [lang, setLang] = useState("es");
+  const L = LABELS[lang];
+  const displayOverallStatus =
+    STATUS_TRANSLATIONS[lang][overallStatus] || overallStatus;
+
   // -------- FUNCIONES AUXILIARES --------
 
   const fetchHistory = async () => {
@@ -35,13 +188,14 @@ function App() {
       setHistory(data);
     } catch (err) {
       console.error(err);
-      setErrorMsg("No se pudo cargar el historial desde el servidor.");
+      setErrorMsg(L.errorLoadingHistory);
     }
   };
 
   useEffect(() => {
     // cargar historial al abrir la app
     fetchHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // -------- MANEJO DE ARCHIVO --------
@@ -89,9 +243,7 @@ function App() {
         setActiveView("validate");
       } catch (err) {
         console.error(err);
-        setErrorMsg(
-          "No se pudo procesar la factura. Verifica que el JSON sea válido y que el backend esté corriendo."
-        );
+        setErrorMsg(L.errorProcessingInvoice);
       } finally {
         setLoading(false);
       }
@@ -99,11 +251,10 @@ function App() {
 
     reader.readAsText(file);
   };
+
   const askAgent = async () => {
     if (!lastInvoiceJson || !fileName) {
-      setErrorMsg(
-        "Primero sube una factura para que el agente pueda analizarla."
-      );
+      setErrorMsg(L.errorAgentNoInvoice);
       return;
     }
 
@@ -128,7 +279,7 @@ function App() {
       setAgentAnswer(data.agentAnswer || "El agente no devolvió respuesta.");
     } catch (err) {
       console.error("Error llamando al agente:", err);
-      setErrorMsg("No se pudo obtener la explicación del agente.");
+      setErrorMsg(L.errorAgent);
     } finally {
       setAgentLoading(false);
     }
@@ -138,27 +289,25 @@ function App() {
 
   const renderHistory = () => (
     <section className="history-section">
-      <h1>Historial de Validaciones</h1>
-      <p className="page-subtitle">
-        Registros de las facturas analizadas (guardadas en SQLite).
-      </p>
+      <h1>{L.historyTitle}</h1>
+      <p className="page-subtitle">{L.historySubtitle}</p>
 
       <div className="table-wrapper">
         <table className="result-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Archivo</th>
-              <th>Fecha</th>
-              <th>Estado global</th>
-              <th>Resumen</th>
+              <th>{L.historyColId}</th>
+              <th>{L.historyColFile}</th>
+              <th>{L.historyColDate}</th>
+              <th>{L.historyColStatus}</th>
+              <th>{L.historyColSummary}</th>
             </tr>
           </thead>
           <tbody>
             {history.length === 0 && (
               <tr>
                 <td colSpan="5" style={{ textAlign: "center", padding: 20 }}>
-                  Todavía no has validado ninguna factura.
+                  {L.historyEmpty}
                 </td>
               </tr>
             )}
@@ -179,12 +328,11 @@ function App() {
                         : "pill-partial")
                     }
                   >
-                    {h.status}
+                    {STATUS_TRANSLATIONS[lang][h.status] || h.status}
                   </span>
                 </td>
                 <td>
-                  {h.ok_count} OK · {h.partial_count} PARCIAL · {h.error_count}{" "}
-                  ERROR
+                  {L.historySummary(h.ok_count, h.partial_count, h.error_count)}
                 </td>
               </tr>
             ))}
@@ -202,10 +350,10 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-logo">
           <span className="logo-mark">K</span>
-          <span className="logo-text">Kila Validator</span>
+          <span className="logo-text">{L.appName}</span>
         </div>
 
-        <div className="sidebar-section-title">Operaciones</div>
+        <div className="sidebar-section-title">{L.operations}</div>
 
         <div
           className={
@@ -215,7 +363,7 @@ function App() {
           onClick={() => setActiveView("validate")}
           style={{ cursor: "pointer" }}
         >
-          Validación de facturas
+          {L.validateMenu}
         </div>
 
         <div
@@ -229,11 +377,11 @@ function App() {
           }}
           style={{ cursor: "pointer" }}
         >
-          Historial
+          {L.historyMenu}
         </div>
 
-        <div className="sidebar-section-title">Sistema</div>
-        <div className="sidebar-item">Configuración (futuro)</div>
+        <div className="sidebar-section-title">{L.system}</div>
+        <div className="sidebar-item">{L.settingsMenu}</div>
 
         <div className="sidebar-footer">
           <div className="user-avatar">J</div>
@@ -251,18 +399,33 @@ function App() {
             {/* TOP BAR */}
             <header className="topbar">
               <div className="topbar-left">
-                <div className="company-pill">Demo Corporation ▾</div>
-                <h1 className="page-title">Validación de Facturas</h1>
-                <p className="page-subtitle">
-                  Sube una factura en JSON y valida si cumple con los requisitos
-                  mínimos exigidos por la DIAN para importación.
-                </p>
+                <div className="company-pill">{L.companyPill}</div>
+                <h1 className="page-title">{L.pageTitle}</h1>
+                <p className="page-subtitle">{L.pageSubtitle}</p>
               </div>
               <div className="topbar-right">
+                <div className="lang-switch">
+                  <button
+                    className={
+                      lang === "es" ? "lang-btn lang-btn-active" : "lang-btn"
+                    }
+                    onClick={() => setLang("es")}
+                  >
+                    ES
+                  </button>
+                  <span className="lang-sep">|</span>
+                  <button
+                    className={
+                      lang === "en" ? "lang-btn lang-btn-active" : "lang-btn"
+                    }
+                    onClick={() => setLang("en")}
+                  >
+                    EN
+                  </button>
+                </div>
+
                 <label className="upload-button">
-                  <span>
-                    {loading ? "Procesando..." : "📂 Importar factura"}
-                  </span>
+                  <span>{loading ? L.uploadProcessing : L.uploadLabel}</span>
                   <input
                     type="file"
                     accept=".json"
@@ -276,9 +439,7 @@ function App() {
                     onClick={askAgent}
                     disabled={agentLoading}
                   >
-                    {agentLoading
-                      ? "Llamando al agente..."
-                      : "🤖 Preguntar al agente"}
+                    {agentLoading ? L.agentButtonLoading : L.agentButton}
                   </button>
                 )}
               </div>
@@ -288,25 +449,13 @@ function App() {
             {errorMsg && (
               <div className="file-pill" style={{ background: "#7f1d1d" }}>
                 {errorMsg}
-                <div className="topbar-right">
-                  <label className="upload-button">
-                    <span>
-                      {loading ? "Procesando..." : "📂 Importar factura"}
-                    </span>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleFileChange}
-                    />
-                  </label>
-                </div>
               </div>
             )}
 
             {/* ARCHIVO SELECCIONADO */}
             {fileName && (
               <div className="file-pill">
-                Archivo cargado: <strong>{fileName}</strong>
+                {L.loadedFilePrefix} <strong>{fileName}</strong>
               </div>
             )}
 
@@ -314,7 +463,7 @@ function App() {
             {validation && (
               <section className="cards-grid">
                 <div className="card">
-                  <div className="card-label">Estado global</div>
+                  <div className="card-label">{L.globalStatus}</div>
                   <div
                     className={
                       "card-value " +
@@ -325,39 +474,33 @@ function App() {
                         : "status-partial")
                     }
                   >
-                    {overallStatus}
+                    {displayOverallStatus}
                   </div>
-                  <div className="card-hint">
-                    Basado en los requisitos mínimos de la DIAN.
-                  </div>
+                  <div className="card-hint">{L.globalHint}</div>
                 </div>
 
                 <div className="card">
-                  <div className="card-label">Total requisitos</div>
+                  <div className="card-label">{L.totalRules}</div>
                   <div className="card-value">{total}</div>
-                  <div className="card-hint">
-                    Requisitos evaluados en la factura.
-                  </div>
+                  <div className="card-hint">{L.totalHint}</div>
                 </div>
 
                 <div className="card">
-                  <div className="card-label">Cumplen</div>
+                  <div className="card-label">{L.okRules}</div>
                   <div className="card-value card-value-ok">{ok}</div>
-                  <div className="card-hint">Requisitos completos.</div>
+                  <div className="card-hint">{L.okHint}</div>
                 </div>
 
                 <div className="card">
-                  <div className="card-label">Con observaciones</div>
+                  <div className="card-label">{L.partialRules}</div>
                   <div className="card-value card-value-warning">{partial}</div>
-                  <div className="card-hint">Datos parciales o dudosos.</div>
+                  <div className="card-hint">{L.partialHint}</div>
                 </div>
 
                 <div className="card">
-                  <div className="card-label">Críticos</div>
+                  <div className="card-label">{L.errorRules}</div>
                   <div className="card-value card-value-error">{error}</div>
-                  <div className="card-hint">
-                    Campos que impedirían la nacionalización.
-                  </div>
+                  <div className="card-hint">{L.errorHint}</div>
                 </div>
               </section>
             )}
@@ -365,11 +508,9 @@ function App() {
             {/* TABLA DETALLE */}
             <section className="table-section">
               <div className="table-header-row">
-                <h2 className="table-title">Resultado por requisito</h2>
+                <h2 className="table-title">{L.tableTitle}</h2>
                 {!validation && (
-                  <span className="table-hint">
-                    Sube una factura JSON para ver los resultados.
-                  </span>
+                  <span className="table-hint">{L.tableHint}</span>
                 )}
               </div>
 
@@ -378,10 +519,10 @@ function App() {
                   <table className="result-table">
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>Requisito</th>
-                        <th>Estado</th>
-                        <th>Detalle</th>
+                        <th>{L.tableColId}</th>
+                        <th>{L.tableColReq}</th>
+                        <th>{L.tableColStatus}</th>
+                        <th>{L.tableColDetail}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -411,17 +552,55 @@ function App() {
                 </div>
               )}
             </section>
+
+            {/* AGENTE */}
             {agentAnswer && (
               <section className="table-section" style={{ marginTop: 12 }}>
-                <h2 className="table-title">Explicación del agente</h2>
-                <p className="page-subtitle">
-                  Interpretación en lenguaje natural de los hallazgos de la
-                  validación.
-                </p>
+                <h2 className="table-title">{L.agentTitle}</h2>
+                <p className="page-subtitle">{L.agentSubtitle}</p>
                 <div
                   style={{ whiteSpace: "pre-wrap", fontSize: 14, marginTop: 8 }}
                 >
                   {agentAnswer}
+                </div>
+              </section>
+            )}
+            {/* DASHBOARD */}
+            {history.length > 0 && (
+              <section className="table-section" style={{ marginTop: 32 }}>
+                <h2 className="table-title">Dashboard</h2>
+                <p className="page-subtitle">
+                  Estadísticas basadas en el historial de facturas validadas.
+                </p>
+
+                <div style={{ width: "100%", height: 300, marginTop: 20 }}>
+                  <ResponsiveContainer>
+                    <BarChart
+                      data={[
+                        {
+                          name: lang === "es" ? "Cumple" : "Pass",
+                          value: history.filter((h) => h.status === "Cumple")
+                            .length,
+                        },
+                        {
+                          name: lang === "es" ? "Parcial" : "Partial",
+                          value: history.filter(
+                            (h) => h.status === "Cumple parcialmente"
+                          ).length,
+                        },
+                        {
+                          name: lang === "es" ? "No cumple" : "Fail",
+                          value: history.filter((h) => h.status === "No cumple")
+                            .length,
+                        },
+                      ]}
+                    >
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#10b981" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </section>
             )}
